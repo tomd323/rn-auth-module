@@ -1,8 +1,10 @@
-import { useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import AuthContextProvider, { AuthContext } from './store/auth-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Colors } from './constants/styles';
 import LoginScreen from './screens/LoginScreen';
@@ -28,7 +30,7 @@ function AuthStack() {
 }
 
 function AuthenticatedStack() {
-  const authCtx = useContext(AuthContext)
+  const authCtx = useContext(AuthContext);
   return (
     <Stack.Navigator
       screenOptions={{
@@ -37,11 +39,14 @@ function AuthenticatedStack() {
         contentStyle: { backgroundColor: Colors.primary100 },
       }}
     >
-      <Stack.Screen name="Welcome" component={WelcomeScreen} options={{
-        headerRight: ({ tintColor }) => (
-          <IconButton icon="exit" color={tintColor} size={24} onPress={authCtx.logout} />
-        ),
-      }}
+      <Stack.Screen
+        name="Welcome"
+        component={WelcomeScreen}
+        options={{
+          headerRight: ({ tintColor }) => (
+            <IconButton icon="exit" color={tintColor} size={24} onPress={authCtx.logout} />
+          ),
+        }}
       />
     </Stack.Navigator>
   );
@@ -49,8 +54,6 @@ function AuthenticatedStack() {
 
 function Navigation() {
   const authCtx = useContext(AuthContext);
-
-
 
   return (
     <NavigationContainer>
@@ -60,12 +63,43 @@ function Navigation() {
   );
 }
 
+function Root() {
+  const [isTryingLogin, setIsTryingLogin] = useState(true);
+  const authCtx = useContext(AuthContext);
+
+  useEffect(() => {
+    // Prevent the splash screen from auto-hiding
+    SplashScreen.preventAutoHideAsync();
+
+    async function fetchToken() {
+      const storedToken = await AsyncStorage.getItem('token');
+
+      if (storedToken) {
+        authCtx.authenticate(storedToken);
+      }
+
+      setIsTryingLogin(false);
+    }
+
+    fetchToken().finally(() => {
+      // Hide the splash screen once the token has been checked
+      SplashScreen.hideAsync();
+    });
+  }, []);
+
+  if (isTryingLogin) {
+    return null;
+  }
+
+  return <Navigation />;
+}
+
 export default function App() {
   return (
     <>
       <StatusBar style="light" />
       <AuthContextProvider>
-        <Navigation />
+        <Root />
       </AuthContextProvider>
     </>
   );
